@@ -1,0 +1,4 @@
+interface:
+  display_name: "CoWork Trajectory Analysis"
+  short_description: "Audit agent strategies and collaboration from versioned traces"
+  default_prompt: "Use $cowork-trajectory-analysis to analyze the selected agent trajectories with evidence-linked strategy and collaboration labels."

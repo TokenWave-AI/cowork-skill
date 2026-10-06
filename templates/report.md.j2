@@ -1,0 +1,250 @@
+{#- Per-model SWE-CoWork report. Every number below is a field of statistics.json (variable `s`).
+    Filters: f1 (1 decimal), f2 (2 decimals), rho (signed 2 decimals), pct0 (integer %), num (thousands). -#}
+{% set sel = s.outcomes.selected %}
+{% set req = s.requirements %}
+{% set L = s.loss %}
+{% set C = s.collaboration %}
+{% set dc = s.delivery_claims %}
+{% set db = s.delivery_claims_broad %}
+{% set df = s.deferrals %}
+{% set qt = s.question_timing %}
+{% set wr = s.workplace_rules %}
+{% set cov = s.coverage %}
+# SWE-CoWork trajectory report: {{ model }}
+
+Generated {{ s.generated_at }} by cowork-model-report-skill from `statistics.json` (this directory).
+Campaign: `{{ s.sources.campaign }}`. Bundle: `{{ s.sources.bundle }}`. Requirement links: `{{ s.sources.package }}`.
+One scored run per task, {{ sel.n }} tasks. Paper section in brackets; `references/paper_mapping.md` maps every
+number to its table cell or sentence.
+
+## 1. Outcomes [§6.1, Table observed-outcomes, Table main]
+
+| Cohort | n | F2P (%) | P2P (%) | Strict (%; count) |
+|---|---:|---:|---:|---:|
+| Selected runs | {{ sel.n }} | {{ sel.macro_f2p_percent|f1 }} | {{ sel.macro_p2p_percent|f1 }} | {{ sel.strict_percent|f1 }} ({{ sel.strict_count }}) |
+
+- {{ model }} resolves {{ sel.macro_f2p_percent|f1 }}% of F2P nodes (macro) and preserves {{ sel.macro_p2p_percent|f1 }}% of P2P nodes; {{ sel.strict_count }} of {{ sel.n }} tasks pass every node.
+- The median run converts {{ s.outcomes.median_f2p_percent|pct0 }}% of its F2P nodes; {{ s.outcomes.runs_f2p_ge_90 }} runs convert at least 90% and {{ s.outcomes.runs_f2p_lt_25 }} convert under 25%.
+- {{ s.outcomes.runs_p2p_all_preserved }} of {{ sel.n }} runs preserve every P2P node.
+- Per-run F2P histogram (10-point bins, 0–100): {{ s.outcomes.f2p_histogram_10|join(' / ') }}.
+
+## 2. Effort and cost [§6.1, Table observed-effort, Table cost]
+
+| Measure | n | Median | IQR [P25, P75] |
+|---|---:|---:|---|
+| Tool calls | {{ s.effort.tool_calls.n }} | {{ s.effort.tool_calls.median|num }} | [{{ s.effort.tool_calls.p25|num }}, {{ s.effort.tool_calls.p75|num }}] |
+| Colleague messages | {{ s.effort.chat_send_attempts.n }} | {{ s.effort.chat_send_attempts.median|num }} | [{{ s.effort.chat_send_attempts.p25|num }}, {{ s.effort.chat_send_attempts.p75|num }}] |
+| Distinct colleagues contacted | {{ s.effort.distinct_colleague_recipients_attempted.n }} | {{ s.effort.distinct_colleague_recipients_attempted.median|num }} | [{{ s.effort.distinct_colleague_recipients_attempted.p25|num }}, {{ s.effort.distinct_colleague_recipients_attempted.p75|num }}] |
+| Wall-clock hours | {{ s.effort.agent_wall_hours.n }} | {{ s.effort.agent_wall_hours.median|f2 }} | [{{ s.effort.agent_wall_hours.p25|f2 }}, {{ s.effort.agent_wall_hours.p75|f2 }}] |
+
+- Table cost (CoWork): wall-clock {{ "%.0f"|format(s.cost.wall_clock_minutes_median) }} min (median), {{ s.cost.tool_calls_median|num }} tool calls (median); tokens: {{ s.cost.tokens_note }}.
+- Spearman ρ with F2P: tool calls {{ s.effort_vs_f2p.tool_calls.spearman|rho }}, colleague messages {{ s.effort_vs_f2p.chat_send_attempts.spearman|rho }}, wall-clock hours {{ s.effort_vs_f2p.agent_wall_hours.spearman|rho }}.
+
+## 3. Requirement acquisition [§6.3 RQ2, Figure requirement-flow a–b]
+
+![requirement flow](figures/fig_requirement_flow.png)
+
+- Across {{ req.tasks }} tasks, {{ req.colleague_held|num }} requirements are held by a named colleague ({{ req.public|num }} are in public records; {{ req.total|num }} total).
+- Obtained (disclosed): {{ req.shares_pct.obtained|pct0 }}% ({{ (req.acquisition.obtained + req.acquisition.get('returned_not_visible', 0))|num }}); card raised with the owner but not disclosed: {{ req.shares_pct.card_raised_not_disclosed|pct0 }}%; owner contacted, card never raised: {{ req.shares_pct.owner_contacted_card_not_raised|pct0 }}%; owner never contacted: {{ req.shares_pct.owner_never_contacted|pct0 }}%.
+- First-question targeting rate: {{ (100 * C.targeting.mean)|pct0 }}%.
+- Node pass rate by information state: public {{ s.node_pass_by_state.public.pass_pct|pct0 }}% (n={{ s.node_pass_by_state.public.n|num }}), colleague-held disclosed {{ s.node_pass_by_state.colleague_obtained.pass_pct|pct0 }}% (n={{ s.node_pass_by_state.colleague_obtained.n|num }}), not disclosed {{ s.node_pass_by_state.colleague_not_obtained.pass_pct|pct0 }}% (n={{ s.node_pass_by_state.colleague_not_obtained.n|num }}).
+{% set g = s.paired_disclosure_gap %}
+- Within-task paired gap (disclosed minus undisclosed): mean {{ g.mean_pp|f1 }} pp, median {{ g.median_pp|f1 }} pp, higher in {{ g.positive }} of {{ g.tasks }} tasks with both kinds (lower in {{ g.negative }}), Wilcoxon p = {{ "%.1e"|format(g.wilcoxon_p) if g.wilcoxon_p is not none else "–" }}.
+- High-confidence links only: public {{ s.node_pass_by_state_high_conf.public.pass_pct|f1 }}%, disclosed {{ s.node_pass_by_state_high_conf.colleague_obtained.pass_pct|f1 }}%, not disclosed {{ s.node_pass_by_state_high_conf.colleague_not_obtained.pass_pct|f1 }}%.
+
+## 4. Loss attribution [§6.3, Table attrib, Figure requirement-flow c]
+
+| Model | Discovery | Ask | Read | Implement | Unresolved | Agreement |
+|---|---:|---:|---:|---:|---:|---:|
+| {{ model }} | {{ L.shares_pct.discovery|f1 }} | {{ L.shares_pct.ask|f1 }} | {{ L.shares_pct.read|f1 }} | {{ L.shares_pct.implement|f1 }} | {{ L.attributed }} | – |
+
+- Of {{ L.failed }} failed F2P nodes, {{ L.excluded_infrastructure }} failed in grader infrastructure and {{ L.unmapped }} test no linked requirement, leaving {{ L.attributed }} (in {{ L.runs_with_failures }} runs).
+- Implement: {{ L.stages.get('implement', 0) }} nodes; functional mismatch {{ L.implement_failure_class.get('functional_failed', 0) }}, build/load failure {{ L.implement_build_or_load }} (compile {{ L.implement_failure_class.get('solver_compile_error', 0) }}, runtime/load {{ L.implement_failure_class.get('solver_runtime_or_load_error', 0) }}), unspecified {{ L.implement_failure_class.get('unspecified', 0) }}.
+- Ask: {{ L.stages.get('ask', 0) }} nodes; card never raised with its owner {{ L.ask_detail.get('card_not_raised', 0) }}, raised but not carried through to a disclosure {{ L.ask_detail.get('card_raised', 0) }}.
+- Discovery {{ L.stages.get('discovery', 0) }}, read {{ L.stages.get('read', 0) }} ({{ cov.disclosures - cov.disclosures_not_visible }} of {{ cov.disclosures }} disclosed replies were returned to the agent).
+- Agreement (Cohen's κ against expert annotation) is not produced by this pipeline.
+
+## 5. Collaboration metrics [§6.4 RQ3, Table ask]
+
+| | Ask rate | Targeting | Gain/Q | Follow-thr. | Redundancy | Unread |
+|---|---:|---:|---:|---:|---:|---:|
+| {{ model }} | {{ (100*C.ask_rate.mean)|f1 }} | {{ (100*C.targeting.mean)|f1 }} | {{ C.gain_per_q.mean|f2 }} | {{ (100*C.followthrough.mean)|f1 }} | {{ (100*C.redundancy.mean)|f1 }} | {{ (100*C.unread.mean)|f1 }} |
+| Spearman ρ with F2P | {{ C.ask_rate.spearman|rho }} | {{ C.targeting.spearman|rho }} | {{ C.gain_per_q.spearman|rho }} | {{ C.followthrough.spearman|rho }} | {{ C.redundancy.spearman|rho }} | {{ C.unread.spearman|rho }} |
+
+- n runs per metric: {% for m in ['ask_rate','targeting','gain_per_q','followthrough','redundancy','unread'] %}{{ m }} {{ C[m].n }}{{ ", " if not loop.last }}{% endfor %}.
+- Largest |ρ| among these six: {{ s.collaboration_max_abs_rho_excl_obtained|f2 }}; obtained-rate ρ = {{ C.obtained_rate.spearman|rho }} (mean {{ (100*C.obtained_rate.mean)|f1 }}%).
+
+## 6. Behaviour rubric [§6.4, Figure behaviour, Table observed-dimensions]
+
+{% if s.review.available %}
+![behaviour](figures/fig_observed_behaviour.png)
+
+Validated rubric reviews: {{ s.review.validated_runs }} of {{ sel.n }} runs{% if s.review.runs_without_review %} (missing: {{ s.review.runs_without_review|join(', ') }}){% endif %}.
+
+| Dimension | Rated n | 0 | 1 | 2 | 3 | Unrated | ρ with F2P | 95% CI |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+{% for d, label in dim_labels.items() %}
+{% set v = s.dimensions[d] %}
+| {{ label }} | {{ v.rated_n }} | {{ v.scores['0'] }} | {{ v.scores['1'] }} | {{ v.scores['2'] }} | {{ v.scores['3'] }} | {{ v.unrated_n }} | {{ v.spearman|rho }}{{ " *" if v.ci_excludes_zero }} | [{{ v.ci95[0]|f2 }}, {{ v.ci95[1]|f2 }}] |
+{% endfor %}
+
+- {{ s.dimensions_ci_excluding_zero }} dimensions have a bootstrap interval excluding zero (*): {% for x in s.dimensions_significant_ranked %}{{ x.label }} ({{ x.spearman|rho }}){{ ", " if not loop.last }}{% endfor %}.
+- Most frequent top rating: {% for x in s.dimensions_top_rated3 %}{{ x.label }} in {{ x.runs }} runs{{ ", " if not loop.last }}{% endfor %}.
+- Lowest-rated dimension: {{ s.dimensions_lowest_mean.label }} (rating {{ s.dimensions_lowest_mean.modal_rating }} in {{ s.dimensions_lowest_mean.modal_count }} of {{ s.dimensions_lowest_mean.rated_n }} assessable runs).
+{% else %}
+Rubric review not merged yet (stage `review` / `review-merge`). Rubric distribution, correlations and stopping
+judgements are omitted; rerun `--stages review-merge,stats,report` once reviews exist.
+{% endif %}
+
+## 7. Stopping [§6.4 calibration and stopping, Figure effort e]
+
+![effort](figures/fig_observed_effort.png)
+
+{% if s.stopping %}
+{% set sp = s.stopping %}
+- {{ sp.autonomous }} runs ended with the agent declaring completion (median {{ sp.autonomous_remaining_hours_median|f1 }} h of budget left); {{ sp.time_budget }} reached the time limit; {{ sp.mixed }} mixed.
+- Reviewer judged the stop premature (supported) in {{ sp.supported }} runs; these stopped with a median {{ sp.supported_remaining_hours_median|f1 }} h remaining.
+- Share of attributed losses at *ask*: premature-stop runs {{ sp.loss_ask_share_by_label.supported.ask_pct|pct0 }}%, uncertain {{ sp.loss_ask_share_by_label.uncertain.ask_pct|pct0 }}%, justified (not_supported) {{ sp.loss_ask_share_by_label.not_supported.ask_pct|pct0 }}%.
+- F2P by stop label: supported {{ sp.f2p_by_label.supported|f1 }}%, uncertain {{ sp.f2p_by_label.uncertain|f1 }}%, not supported {{ sp.f2p_by_label.not_supported|f1 }}%.
+- Known unresolved items listed by the reviewer: {{ sp.known_unresolved_items }} in total (median {{ sp.known_unresolved_median }} per run).
+- Ending × label counts: {% for k, v in sp.counts.items() %}{{ k }}={{ v }}{{ ", " if not loop.last }}{% endfor %}.
+{% else %}
+Stopping judgements need the rubric review (not merged).
+{% endif %}
+
+## 8. Workplace basics [§6.5, Figure basics]
+
+![workplace basics](figures/fig_workplace_basics.png)
+
+**8.1 Reports work as done that is not done.** {{ wr.told_delivery_note }} task briefs ask for a delivery note. Across {{ dc.scored|num }} requirements with tests in {{ dc.runs }} runs, the handoff flagged {{ dc.failed_listed_open_pct|pct0 }}% of the {{ dc.failed }} failed requirements as open ({{ dc.failed_listed_open }}), reported {{ dc.failed_claimed_done_pct|pct0 }}% as done ({{ dc.failed_claimed_done }}) and did not mention {{ dc.failed - dc.failed_listed_open - dc.failed_claimed_done }}; {{ dc.failed_not_flagged_open }} failed requirements were not flagged open. Of {{ dc.claimed_done }} requirements reported done, {{ dc.claimed_done_failed }} ({{ dc.claimed_done_failed_pct|pct0 }}%) fail their tests; with the broad reading (rows of "confirmed requirements" tables count as claims) {{ db.claimed_done_failed }} of {{ db.claimed_done|num }} ({{ db.claimed_done_failed_pct|pct0 }}%). Silent failures (done-but-failing): functional {{ dc.claimed_done_failed_kind.get('functional', 0) }}, build/load {{ dc.claimed_done_failed_kind.get('build_or_load', 0) }}, other {{ dc.claimed_done_failed_kind.get('other', 0) }}. Per run (runs with ≥1 failed requirement, n={{ dc.runs_with_failures }}): median silent share {{ dc.median_silent_share|f2 }}, {{ dc.runs_with_silent }} runs with any, {{ dc.runs_half_or_more }} with half or more.
+{% if dc.get("blind_check") %}
+Blind check of {{ dc.blind_check.n }} random silent failures: {{ dc.blind_check.get('genuine_claim', 0) }} unqualified claims, {{ dc.blind_check.get('hedged', 0) }} caveated elsewhere, {{ dc.blind_check.get('not_a_claim', 0) }} not a claim.
+{% else %}
+No blind check supplied for this model. The keyword classifier over-counts claims (in the paper's blind check about a third of sampled silent failures were hedged or not claims), so treat the claimed-done counts as an upper bound.
+{% endif %}
+
+| Delivery note said | Tests fail | Tests pass |
+|---|---:|---:|
+| Reported done | {{ dc.table.get('claimed_done|False', 0) }} | {{ dc.table.get('claimed_done|True', 0) }} |
+| Flagged open | {{ dc.table.get('claimed_partial_or_open|False', 0) }} | {{ dc.table.get('claimed_partial_or_open|True', 0) }} |
+| Not mentioned | {{ dc.table.get('not_mentioned|False', 0) }} | {{ dc.table.get('not_mentioned|True', 0) }} |
+
+**8.2 Does not chase answers it was promised.** {{ df.threads }} owner–card threads across {{ df.runs_with_threads }} runs began with a deferral. In {{ df.followed }} the agent came back to the same owner about the same card and {{ df.followed_disclosed }} ({{ df.followed_disclosed_pct|pct0 }}%) ended disclosed; in {{ df.abandoned }} ({{ df.abandoned_pct|pct0 }}%) it never asked again, and {{ df.abandoned_disclosed }} of those were disclosed. Median budget left at an abandoned deferral: {{ df.abandoned_budget_left_median|f1 }} h ({{ df.abandoned_budget_left_over_2h }} with >2 h); the agent kept working a median {{ df.abandoned_run_continued_median|f1 }} h more ({{ df.abandoned_run_continued_over_1h }} threads >1 h). {{ df.runs_with_abandoned }} runs abandon at least one thread.
+
+**8.3 Builds first, asks later.** {{ (100*qt.first_fifth)|pct0 }}% of {{ qt.total|num }} colleague messages fall in the first fifth of the run; the first code edit comes at a median {{ (100*qt.first_edit_median_fraction)|pct0 }}% of the run ({{ qt.runs_with_edit }} runs edit), and {{ (100*qt.after_first_edit)|pct0 }}% of questions come after it; {{ (100*qt.last_fifth)|pct0 }}% fall in the final fifth. Deciles: {{ qt.deciles|join(' / ') }}.
+
+**8.4 Bends the rules.** {{ wr.rule_runs }} briefs state the test-preservation rule without a migration exception; in {{ wr.edited_existing_tests }} of these runs the agent changed or removed lines in existing test sources (median {{ wr.lines_removed_median if wr.lines_removed_median is not none else '–' }} lines; {{ wr.deleted_test_files }} test files deleted; rows {{ wr.edited_rows|join(', ') if wr.edited_rows else '–' }}). {{ wr.time_budget_no_note }} of the {{ wr.time_budget_runs }} runs that reached the time limit left no delivery note (all runs without a note: {{ wr.no_delivery_note|join(', ') if wr.no_delivery_note else 'none' }}).
+
+## 9. Strata [§6.9, Table strata]
+
+| Axis | Stratum | n | F2P (%) | Strict | Disclosed (%) |
+|---|---|---:|---:|---:|---:|
+{% for key, (axis, keys, labels) in strata.items() %}
+{% for k in keys %}
+{% set d = s.strata[key].get(k) %}
+| {{ axis if loop.first else '' }} | {{ k }} | {{ d.n if d else 0 }} | {{ d.f2p|f1 if d else '–' }} | {{ d.strict if d else '–' }} | {{ d.obtained|f1 if d else '–' }} |
+{% endfor %}
+{% endfor %}
+
+Strict completions by domain: {% for k, v in s.strict_rows_by_domain.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}.
+
+## 10. Qualitative case candidates [§6.10]
+
+Selected automatically by fixed rules; read the evidence before writing them up (the paper's cases were
+hand-picked and may differ).
+{% for key, title in [('ask_loss', 'Asking once is not following through'), ('implement_despite_all_obtained', 'Having every answer is not delivering it'), ('abandoned_deferrals', 'Listing open items is not closing them')] %}
+{% if key in s.cases %}
+{% set c = s.cases[key] %}
+
+### {{ loop.index }}. {{ title }} — row {{ c.row }} ({{ c.task_id }})
+
+Rule: {{ c.rule }}. F2P {{ c.f2p_passed }}/{{ c.f2p_total }}; {{ c.obtained }} of {{ c.colleague_held }} colleague-held requirements obtained; {{ c.failed_attributed }} attributed failed nodes ({{ c.lost_ask }} at ask, of which {{ c.lost_ask_card_raised }} with the card raised; {{ c.lost_implement }} at implement, {{ c.implement_functional }} functional); {{ c.deferrals_abandoned }} of {{ c.deferrals_total }} deferral threads abandoned; stop judgement {{ c.stop_label or '–' }} ({{ c.ending_type or '–' }}, {{ c.known_unresolved_items if c.known_unresolved_items is not none else '–' }} known unresolved items); {{ c.messages }} colleague messages over {{ c.wall_hours|f1 }} h.
+{% if c.get("most_asked_undisclosed_card") %}
+Most-asked undisclosed card: {{ c.most_asked_undisclosed_card.card }}, asked {{ c.most_asked_undisclosed_card.questions }} times at {{ c.most_asked_undisclosed_card.hours|join(', ') }} h; first question at `{{ c.most_asked_undisclosed_card.first_call }}`.
+{% endif %}
+{% if c.get("abandoned_threads") %}
+Abandoned threads: {% for t in c.abandoned_threads %}{{ t.card }} ({{ t.budget_left_hours|f1 }} h left){{ ", " if not loop.last }}{% endfor %}.
+{% endif %}
+Evidence: {% for k, v in c.evidence.items() %}{{ k }} `{{ v }}`{{ "; " if not loop.last }}{% endfor %}.
+{% endif %}
+{% endfor %}
+
+## 11. Data coverage and reconciliation
+
+- Runs: {{ cov.runs }}; per-node results reproduce the reported F2P/P2P counts for {{ cov.reconciled }}.
+{% for u in cov.unreconciled %}
+  - Unreconciled row {{ u.row }}: {{ u.notes }}. Its {{ s.f2p_nodes.unresolved }} F2P nodes are `unresolved` and excluded from node-level analyses; the row is also skipped by the delivery-claims stage.
+{% endfor %}
+- F2P nodes: {{ s.f2p_nodes.total|num }} total, {{ s.f2p_nodes.graded|num }} graded. Link confidence (all nodes): {% for k, v in s.mapping_confidence_all_nodes.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}.
+- Runs without saved sidecar events: {{ cov.missing_sidecar_rows|join(', ') if cov.missing_sidecar_rows else 'none' }} (communication fields for these are blank, not zero).
+- Disclosures: {{ cov.disclosures|num }}, of which {{ cov.disclosures_not_visible }} were never returned to the agent; {{ cov.notifications_visible }} distinct notices were returned.
+- Runs without package requirement links: {{ cov.rows_without_requirement_links|join(', ') if cov.rows_without_requirement_links else 'none' }}.
+- Strata without release metadata: {{ s.strata.runs_without_release_metadata|join(', ') if s.strata.runs_without_release_metadata else 'none' }}.
+- Not produced: Oracle-Spec columns, pass^k (no seeds), exact token totals, attribution agreement (κ). Colleague-call failure reporting is intentionally excluded.
+
+## 12. Beyond the paper: descriptive detail
+
+Numbers in this section are not in the paper. They are here so that questions about the runs can be
+answered from this directory; per-run detail (every question and reply, the full trajectory, failed
+nodes with grader output, the patch and delivery note, the reviewer report) is in `runs/NNN/`
+(index: `runs/INDEX.md`; one wide row per run: `data/RUN_SUMMARY.csv`).
+{% set X = s.extended %}
+
+**Run endings:** {% for k, v in X.end_reasons.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}.
+
+| Telemetry (per run) | n | total | median | P25 | P75 | min | max |
+|---|---:|---:|---:|---:|---:|---:|---:|
+{% for k, v in X.telemetry.items() if v %}
+| {{ k }} | {{ v.n }} | {{ v.sum|num }} | {{ v.median|num }} | {{ v.p25|num }} | {{ v.p75|num }} | {{ v.min|num }} | {{ v.max|num }} |
+{% endfor %}
+{% if X.get('patch') %}
+{% for k, v in X.patch.items() if v %}
+| {{ k }} | {{ v.n }} | {{ v.sum|num }} | {{ v.median|num }} | {{ v.p25|num }} | {{ v.p75|num }} | {{ v.min|num }} | {{ v.max|num }} |
+{% endfor %}
+{% endif %}
+
+Token counts are those observed in the saved assistant messages (`solver_observed_*`); the harness did not
+record exact cumulative totals, so treat them as lower bounds.
+
+**Tool use (all runs):**
+
+| Tool | Calls | Errors | Runs using it |
+|---|---:|---:|---:|
+{% for t in X.tools %}
+| {{ t.tool }} | {{ t.calls|num }} | {{ t.errors|num }} | {{ t.runs }} |
+{% endfor %}
+
+**Failed test nodes by failure class:** F2P {% for k, v in X.failure_classes.f2p.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}; P2P {% for k, v in X.failure_classes.p2p.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}.
+{% if X.get('review_episode_kinds') %}
+
+{% set ek = X.review_episode_kinds.items()|selectattr(1, 'ge', 3)|list %}
+**Reviewer annotations.** Episode kinds (≥3 episodes): {% for k, v in ek %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}; {{ X.review_episode_kinds|length - ek|length }} free-form kinds with fewer ({{ X.review_episode_kinds.values()|sum - ek|map(attribute=1)|sum }} episodes; all in `review/summary/EPISODES.csv`).
+Strategy-phase tags: {% for k, v in X.review_phase_tags.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}.
+
+| Reviewer-flagged quality issue | Severity | Flags | Runs |
+|---|---|---:|---:|
+{% for x in X.review_quality_issues %}
+| {{ x.category }} | {{ x.severity }} | {{ x.n }} | {{ x.runs }} |
+{% endfor %}
+
+Reviewer cost per run (median): input {{ X.reviewer_usage.input_tokens.median|num }} tokens ({{ X.reviewer_usage.cached_input_tokens.median|num }} cached), output {{ X.reviewer_usage.output_tokens.median|num }}.
+{% endif %}
+{% if X.get('per_run') %}
+
+### 12.1 Every run
+
+Lost at: D discovery, A ask, R read, I implement (failed F2P nodes). Claims: reported done but failing / reported done (strict reading).
+Deferrals: abandoned / threads. Stop: reviewer's premature-stop label.
+
+| Row | Task | Lang | F2P | P2P | End | h | Tools | Msgs | Obtained | Lost D/A/R/I | Deferrals | Claims | Patch +/− | Stop |
+|---|---|---|---:|---:|---|---:|---:|---:|---:|---|---:|---:|---:|---|
+{% for r in X.per_run %}
+| [{{ r.row }}](runs/{{ r.row }}/RUN.md) | {{ r.task_id }} | {{ r.language }} | {{ r.f2p_passed }}/{{ r.f2p_total }} | {{ r.p2p_passed }}/{{ r.p2p_total }} | {{ r.end_reason }} | {{ r.agent_hours|float|f1 }} | {{ r.tool_calls }} | {{ r.messages }} | {{ r.obtained }}/{{ r.colleague_held }} | {{ r.lost_discovery }}/{{ r.lost_ask }}/{{ r.lost_read }}/{{ r.lost_implement }} | {{ r.deferrals_abandoned }}/{{ r.deferral_threads }} | {{ r.claimed_done_failed }}/{{ r.claimed_done }} | {{ r.patch_added }}/{{ r.patch_removed }} | {{ r.stop_label or '–' }} |
+{% endfor %}
+{% endif %}
+
+## Files
+
+`paper_rows.tex` (paste-ready rows), `tables/*.tex`, `figures/*.pdf`, `statistics.json`, `data/*.csv`
+(including `RUN_SUMMARY.csv`), `telemetry/` (every question, reply, disclosure and notification chain),
+`review/summary/` (reviewer annotations), `runs/NNN/` (per-run dossiers).

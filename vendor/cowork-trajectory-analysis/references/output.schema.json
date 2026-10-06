@@ -1,0 +1,530 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1.0.0"
+      ]
+    },
+    "task": {
+      "type": "object",
+      "properties": {
+        "row": {
+          "type": "string"
+        },
+        "task_id": {
+          "type": "string"
+        },
+        "task_version": {
+          "type": "string"
+        },
+        "task_package_sha256": {
+          "type": "string"
+        },
+        "run_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "row",
+        "task_id",
+        "task_version",
+        "task_package_sha256",
+        "run_id"
+      ],
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "action_index_fully_examined": {
+          "type": "boolean"
+        },
+        "total_actions": {
+          "type": "integer"
+        },
+        "examined_actions": {
+          "type": "integer"
+        },
+        "detailed_events_examined": {
+          "type": "integer"
+        },
+        "files_examined": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "action_index_fully_examined",
+        "total_actions",
+        "examined_actions",
+        "detailed_events_examined",
+        "files_examined",
+        "missing_evidence",
+        "limitations"
+      ],
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "strategy_profile": {
+          "type": "string"
+        },
+        "overall_assessment": {
+          "type": "string"
+        },
+        "strengths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "weaknesses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "strategy_profile",
+        "overall_assessment",
+        "strengths",
+        "weaknesses"
+      ],
+      "additionalProperties": false
+    },
+    "strategy_dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "observation_status": {
+            "type": "string",
+            "enum": [
+              "observed",
+              "not_observed",
+              "not_applicable",
+              "censored",
+              "ambiguous"
+            ]
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "assessment": {
+            "type": "string"
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "counterevidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "observation_status",
+          "score",
+          "confidence",
+          "assessment",
+          "evidence_ids",
+          "counterevidence_ids"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "collaboration_dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "observation_status": {
+            "type": "string",
+            "enum": [
+              "observed",
+              "not_observed",
+              "not_applicable",
+              "censored",
+              "ambiguous"
+            ]
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "assessment": {
+            "type": "string"
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "counterevidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "observation_status",
+          "score",
+          "confidence",
+          "assessment",
+          "evidence_ids",
+          "counterevidence_ids"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "strategy_phases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "phase": {
+            "type": "string"
+          },
+          "start_event_id": {
+            "type": "string"
+          },
+          "end_event_id": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "broad_mapping",
+                "directed_search",
+                "hypothesis_driven",
+                "implementation_first",
+                "dependency_first",
+                "example_driven",
+                "generalization",
+                "trial_and_error",
+                "verification_first",
+                "recovery",
+                "closeout",
+                "mixed"
+              ]
+            }
+          },
+          "description": {
+            "type": "string"
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "phase",
+          "start_event_id",
+          "end_event_id",
+          "tags",
+          "description",
+          "evidence_ids"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "episodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "interpretation": {
+            "type": "string"
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "counterevidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "alternative_explanation": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "summary",
+          "interpretation",
+          "evidence_ids",
+          "counterevidence_ids",
+          "alternative_explanation",
+          "confidence"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "stop_assessment": {
+      "type": "object",
+      "properties": {
+        "ending_type": {
+          "type": "string",
+          "enum": [
+            "autonomous_completion",
+            "time_budget",
+            "provider_interruption",
+            "tool_or_environment_failure",
+            "mixed",
+            "unknown"
+          ]
+        },
+        "premature_stop": {
+          "type": "string",
+          "enum": [
+            "supported",
+            "not_supported",
+            "uncertain",
+            "not_applicable"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "known_unresolved_items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "ending_type",
+        "premature_stop",
+        "reason",
+        "known_unresolved_items",
+        "evidence_ids"
+      ],
+      "additionalProperties": false
+    },
+    "quality_flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "task_contract",
+              "scoring",
+              "colleague",
+              "provider",
+              "harness_tools",
+              "environment",
+              "suspected_leakage",
+              "telemetry"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "informational",
+              "concern",
+              "material"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "observed",
+              "suspected",
+              "unknown"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "potential_impact": {
+            "type": "string"
+          },
+          "check_needed": {
+            "type": "string"
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "category",
+          "severity",
+          "status",
+          "description",
+          "scope",
+          "potential_impact",
+          "check_needed",
+          "evidence_ids"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "line_start": {
+            "type": "integer"
+          },
+          "line_end": {
+            "type": "integer"
+          },
+          "event_id": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "supports": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "path",
+          "line_start",
+          "line_end",
+          "event_id",
+          "quote",
+          "supports"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "task",
+    "coverage",
+    "summary",
+    "strategy_dimensions",
+    "collaboration_dimensions",
+    "strategy_phases",
+    "episodes",
+    "stop_assessment",
+    "quality_flags",
+    "evidence",
+    "limitations"
+  ],
+  "additionalProperties": false
+}
