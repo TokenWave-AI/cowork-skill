@@ -1,9 +1,29 @@
-# cowork-model-report：任意模型的 SWE-CoWork 轨迹分析报告
+# cowork-model-report：用 agent 逐题分析 SWE-CoWork 轨迹，产出每个模型的论文级报告
 
 ## 它做什么
 
-给定某个模型在 SWE-CoWork 上的一批 CoWork 运行，产出与论文同口径的分析，并把每条轨迹里能取到的
-信息尽量都留在报告目录里。这样读报告的人不用再去找原始轨迹。
+核心是**每道题起一个 codex agent 分析这道题的轨迹**，一共两轮。100 道题就是 100 + 100 个 agent，并发跑。
+
+- **第 1 轮，盲审**（`skills/cowork-trajectory-analysis`）：agent 只能看到这道题的轨迹，看不到分数。
+  它按 16 个维度（10 项策略、6 项协作）打分，并给出策略阶段、关键情节、提前停止判断和质量问题。
+  每条结论都引用轨迹原文的行号。
+- **第 2 轮，失败诊断**（`skills/cowork-failure-diagnosis`）：agent 能看到这道题的测试结果、需求表、
+  题目完整规格和第 1 轮报告。对每条没通过的需求，它在轨迹里追完整条链：最先看到 → 提问 → 回复 →
+  决定 → 写代码 → 自测 → 交付说明怎么写的。然后判断丢在哪个阶段、属于哪种机制、哪一步本可以避免，
+  并核对交付说明有没有虚报。最后写出意外的职场表现发现，以及一段可以直接放进论文的案例。
+
+控制器（`scripts/stages/review_runner.py`）负责几件事：
+- 并发调度，遇到 429 自动减半并发。
+- 每份报告的引用都用程序逐条核对；不合格就让 agent 修，最多修 2 次。
+- 断了能接着跑。
+
+每个 agent 都在独立沙箱里运行（`scripts/agent_runtime.py`）：
+- 只能写自己的目录，shell 不能联网。
+- 看不到其他题；第 1 轮还看不到分数。
+- API key 不进 agent 的环境。
+
+agent 的结果再和脚本统计合并，产出与论文同口径的分析。每条轨迹里能取到的信息都尽量留在报告目录里，
+读报告的人不用再去找原始轨迹。
 
 **论文用的部分**
 - `statistics.json`：报告、LaTeX 和图里的全部数字都只来自这一个文件。
@@ -28,6 +48,11 @@
   - 另有 `SOLUTION.md`（交付说明）、`model.patch` 和 `PATCH_STAT.csv`、`review.md`/`review.json`
     （审查报告全文）、`REQUIREMENTS.csv`、`NODES.csv`。
 - `data/RUN_SUMMARY.csv`：逐题宽表，汇总所有逐题指标。
+- `review/reviews/rows/NNN/report.{json,md}`：第 1 轮 agent 的报告；汇总在 `review/summary/`。
+- `diagnosis/rows/NNN/report.{json,md}`：第 2 轮 agent 的报告；汇总在 `diagnosis/summary/`：
+  - `DIAGNOSES.csv`：每条失败需求一行（阶段、机制、责任、交付说明是否属实、本可避免的那一步）。
+  - `RUNS.csv`：每题的一句话结论和案例段落。
+  - `FINDINGS.csv`、`REVISIONS.csv`、`SUMMARY.json`。
 - `data/`、`telemetry/communication/`、`review/summary/`：各阶段的中间 CSV/JSONL。每个问题、
   回复、披露、通知链都在这里。
 
@@ -40,8 +65,7 @@
   `release101_tasks.json`（题目元数据，用于分层）、`repository_domains.json`。还有 Opus-5.5
   的回归数据：论文数字 `opus55_paper_numbers.json` 和交付声明盲审样本。
 - **公开题包**（`--bundle`）和**评测轨迹**（`--campaign`）。
-- **LLM 审查运行时**：`reviewer_runtime.py`、API key、带 jsonschema ≥ 4 的 Python。只有可选的
-  review 阶段需要。
+- **API key**：agent 轮次需要一个 Responses API 的地址和 key。
 
 ## 前置条件
 
@@ -72,22 +96,28 @@ $R --stages prepare --prepare-args "--status-dir <评测 status 目录> --hosts-
 # 2) 全部非 LLM 阶段：telemetry → nodes → collab → basics → dossier → stats → report（99 题约 1 分钟）
 $R
 
-# 3)（可选，花钱）LLM rubric 审查：先 dry-run，再小批试审，最后全量
-export CMR_REVIEWER_RUNTIME=<reviewer_runtime.py> CMR_REVIEW_PYTHON=<python with jsonschema>=4> CMR_REVIEW_API_KEY=<key>
-$R --stages review --review-dry-run --review-rows 1,2
+# 3) agent 环境（两轮共用）
+export CMR_CODEX_BIN=<codex 可执行文件> CMR_REVIEW_BASE_URL=https://<api>/v1 CMR_REVIEW_API_KEY=<key> \
+       CMR_REVIEW_PYTHON=<装了 jsonschema 的 python>
+
+# 4) 第 1 轮盲审：每题一个 agent。先试 1–4 题、看报告，再全量
+$R --stages review --review-rows 5 --review-concurrency 1
 $R --stages review --review-concurrency 20
+$R --stages review-merge,dossier
 
-# 4) 合并审查结果，重出档案、统计和报告
-$R --stages review-merge,dossier,stats,report
+# 5) 第 2 轮失败诊断：每题一个 agent，同样先试再全量
+$R --stages diagnose --review-rows 5 --review-concurrency 1
+$R --stages diagnose --review-concurrency 20
+$R --stages diagnose-merge,stats,report
 
-# 5) 多模型对比
+# 6) 多模型对比
 python3 $SK/scripts/cross_model.py <OUT_A> <OUT_B> ... --dest <DEST>
 ```
 
 每个阶段做完要检查什么、怎么续跑，见 `SKILL.md`。所有输出都只写到 `--out`，campaign 和题包
 只读。
 
-LLM 审查成本参考（99 题，gpt-6-astra xhigh）：
+agent 成本参考（第 1 轮，99 题，gpt-6-astra xhigh；第 2 轮单题量级相近）：
 - 每次尝试中位约 26 分钟，平均每题约 1.8 次尝试。
 - 并发 16–20 时全量约 3.5 小时。
 - 单题中位输入约 710 万 token（绝大部分命中缓存），输出约 3.2 万。
@@ -111,7 +141,10 @@ scripts/check_paper_numbers.py 回归检查：statistics.json 对照论文数字
 templates/report.md.j2         报告模板
 references/definitions.md      口径定义（附录 H + 实现细则）
 references/paper_mapping.md    statistics.json 字段 → 论文表格单元格 / 句子
-vendor/cowork-trajectory-analysis/   1.2 版行为标注 skill（rubric、schema、validate_report.py）
+skills/cowork-trajectory-analysis/   第 1 轮 agent 的 skill（rubric、schema、validate_report.py）
+skills/cowork-failure-diagnosis/     第 2 轮 agent 的 skill（机制表、schema、validate_diagnosis.py）
+scripts/agent_runtime.py       单个 agent 的沙箱启动器
+scripts/stages/review_runner.py      两轮共用的并发控制器（--phase review|diagnosis）
 ```
 
 ## 已知注意事项
@@ -126,7 +159,9 @@ vendor/cowork-trajectory-analysis/   1.2 版行为标注 skill（rubric、schema
 4. **逐节点对账要求精确相等。** 某题的 verifier 日志如果复现不出报告分数，该题整题记为
    unresolved，并从节点级分析和交付声明中排除。遇到新的日志格式时，在 `build_node_outcomes.py`
    的 `supplemental()` 里按题加规则，不要放宽相等条件。
-5. **rubric 是模型标注。** 没有人类一致性；Spearman 相关只用于探索。
+5. **两轮都是模型标注。** 第 1 轮 rubric 没有人类一致性，Spearman 相关只用于探索。第 2 轮的
+   归因和案例段落引用的证据是程序核对过的，但"为什么失败"仍然是 agent 的判断。写进论文前要抽查，
+   尤其是 `stage_agrees=false` 的条目。
 6. **本流水线不产出以下列。** Oracle-Spec、pass^k、token 总量和 κ 一致性需要额外实验，
    `paper_rows.tex` 中对应单元格保留为 `\tbd`。第 12 节的 token 数是轨迹里观测到的值，只能当下界。
 7. **案例只是候选。** 案例按固定规则自动挑选，写进论文前必须看证据（`runs/NNN/`）。

@@ -386,6 +386,15 @@ def main():
     # ---------------------------------------------------------------- beyond the paper (report §12)
     out["extended"] = extended(cfg, runs)
 
+    # ---------------------------------------------------------------- round-2 agent diagnoses (report §13)
+    ds = cfg.out / "diagnosis" / "summary"
+    if (ds / "SUMMARY.json").exists():
+        dsum = json.loads((ds / "SUMMARY.json").read_text())
+        dsum["runs_table"] = read_csv(ds / "RUNS.csv")
+        dsum["findings_table"] = [f for f in read_csv(ds / "FINDINGS.csv") if f["novelty"] in ("striking", "notable")]
+        dsum["revisions_table"] = read_csv(ds / "REVISIONS.csv")
+        out["diagnosis"] = dsum
+
     (cfg.out / "statistics.json").write_text(json.dumps(out, indent=1, default=float, ensure_ascii=False) + "\n")
     print(json.dumps({k: out[k] for k in ("outcomes", "requirements", "loss")}, indent=1, default=float)[:3000])
 

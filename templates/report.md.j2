@@ -243,6 +243,46 @@ Deferrals: abandoned / threads. Stop: reviewer's premature-stop label.
 {% endfor %}
 {% endif %}
 
+{% if s.get('diagnosis') %}
+{% set G = s.diagnosis %}
+## 13. Agent failure diagnosis (round 2)
+
+One Codex agent per run (skill `cowork-failure-diagnosis`) traced every failed requirement through the trajectory
+with outcomes, the requirement map and the complete specification in view. Validated diagnoses: {{ G.runs }} runs,
+{{ G.requirements }} failed requirements (states: {% for k, v in G.states.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}).
+Agent judgements with mechanically checked citations; spot-check before quoting, especially stage disagreements.
+
+**Stage (agent verdict):** {% for k, v in G.stage.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}.
+Agreement with the pipeline's mechanical loss stage: {{ (100 * G.stage_agreement)|pct0 if G.stage_agreement is not none else '–' }}%.
+Pipeline → agent: {% for k, v in G.stage_matrix.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}.
+
+**Mechanisms:** {% for k, v in G.mechanism.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}.
+
+**Agent responsible:** {% for k, v in G.agent_responsible.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}.
+**Delivery note on failed requirements:** {% for k, v in G.note_verdict.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}.
+**Run-level delivery audit:** {% for k, v in G.delivery_audit.items() %}{{ k }} {{ v }}{{ ", " if not loop.last }}{% endfor %}.
+Round-1 judgements revised after seeing outcomes: {{ G.revisions }}.
+
+### 13.1 Notable workplace findings
+
+| Row | Novelty | Finding | Requirements |
+|---|---|---|---|
+{% for f in G.findings_table %}
+| [{{ f.row }}](diagnosis/rows/{{ f.row }}/report.md) | {{ f.novelty }} | **{{ f.title }}** {{ f.description|replace('\n', ' ')|replace('|', '\\|') }} | {{ f.req_ids }} |
+{% endfor %}
+
+### 13.2 One line per run
+
+| Row | F2P | Delivery audit | Dominant mechanism | Headline |
+|---|---|---|---|---|
+{% for r in G.runs_table %}
+| [{{ r.row }}](diagnosis/rows/{{ r.row }}/report.md) | {{ r.f2p }} | {{ r.delivery_audit }} | {{ r.dominant_mechanism }} | {{ r.headline|replace('\n', ' ')|replace('|', '\\|') }} |
+{% endfor %}
+
+Case paragraphs for every run: `diagnosis/summary/RUNS.csv` (`case_paragraph`); per-requirement chains:
+`diagnosis/summary/DIAGNOSES.csv`.
+{% endif %}
+
 ## Files
 
 `paper_rows.tex` (paste-ready rows), `tables/*.tex`, `figures/*.pdf`, `statistics.json`, `data/*.csv`

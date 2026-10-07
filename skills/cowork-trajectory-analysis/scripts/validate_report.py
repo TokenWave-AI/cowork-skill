@@ -42,7 +42,8 @@ def validate(report, input_dir, schema_path=None):
     import jsonschema
     input_dir = Path(input_dir).resolve()
     schema_path = Path(schema_path or Path(__file__).resolve().parents[1] / 'references/output.schema.json')
-    errors = [str(e.message) for e in jsonschema.Draft202012Validator(json.loads(schema_path.read_text())).iter_errors(report)]
+    Validator = getattr(jsonschema, 'Draft202012Validator', None) or jsonschema.Draft7Validator
+    errors = [str(e.message) for e in Validator(json.loads(schema_path.read_text())).iter_errors(report)]
     if errors:
         return errors
     source = json.loads((input_dir / 'INPUTS.json').read_text())

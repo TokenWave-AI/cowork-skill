@@ -16,6 +16,9 @@ no network and no LLM):
   review        (f) LLM rubric review (gpt-6-astra/xhigh via the 1.2 skill); costs money, see SKILL.md.
                     Runs review_runner.py, then summarize.
   review-merge  (f') summarize already-completed reviews (OUT/review/reviews or --reviews DIR) -> stopping.csv
+  diagnose      (i) round-2 agents: one codex per run with outcomes + spec -> OUT/diagnosis/rows/NNN/report.json
+                    (builds OUT/diagnosis/context first; run after review-merge + dossier)
+  diagnose-merge (i') summarize diagnoses -> OUT/diagnosis/summary/, consumed by stats/report
   dossier       (h) per-run dossiers: full conversations, transcript, requirement/node tables,
                     patch, delivery note, reviewer report -> OUT/runs/NNN/, OUT/data/RUN_SUMMARY.csv
   stats         (g) statistics.json
@@ -59,11 +62,14 @@ STAGE_OUTPUTS = {
     'review': ['review/summary/RUN_ANALYSIS.csv', 'data/stopping.csv'],
     'review-merge': ['review/summary/RUN_ANALYSIS.csv', 'data/stopping.csv'],
     'dossier': ['runs/INDEX.md', 'data/RUN_SUMMARY.csv'],
+    'diagnose': ['diagnosis/summary/DIAGNOSES.csv'],
+    'diagnose-merge': ['diagnosis/summary/DIAGNOSES.csv'],
     'stats': ['statistics.json'],
     'report': ['report.md', 'paper_rows.tex'],
 }
 DEFAULT = ['telemetry', 'nodes', 'collab', 'basics', 'review-merge', 'dossier', 'stats', 'report']
-ORDER = ['prepare', 'telemetry', 'nodes', 'collab', 'basics', 'review', 'review-merge', 'dossier', 'stats', 'report']
+ORDER = ['prepare', 'telemetry', 'nodes', 'collab', 'basics', 'review', 'review-merge', 'dossier', 'diagnose',
+         'diagnose-merge', 'stats', 'report']
 
 
 def run(cmd, cfg, log, env_extra=None):
@@ -101,7 +107,7 @@ def stage_cmds(name, cfg, a):
         c += [[PY, S / 'build_claims.py'], ('CLAIMS_BROAD', [PY, S / 'build_claims.py']),
               [PY, S / 'build_workplace_basics.py']]
     elif name == 'review':
-        skill = HERE.parent / 'vendor' / 'cowork-trajectory-analysis'
+        skill = HERE.parent / 'skills' / 'cowork-trajectory-analysis'
         rpy = review_python(a)
         cmd = [rpy, '-B', S / 'review_runner.py', '--inputs-manifest', cfg.manifest_path, '--skill', skill,
                '--schema', skill / 'references' / 'output.schema.json', '--output', cfg.review / 'reviews',
@@ -118,6 +124,22 @@ def stage_cmds(name, cfg, a):
             print('  review-merge: no reviews at', src, '-> report will omit rubric/stopping sections')
             return []
         c += [[review_python(a), S / 'summarize_reviews.py', '--reviews', src]]
+    elif name in ('diagnose', 'diagnose-merge'):
+        reviews = a.reviews or str(cfg.review / 'reviews')
+        if name == 'diagnose':
+            skill = HERE.parent / 'skills' / 'cowork-failure-diagnosis'
+            rpy = review_python(a)
+            c += [[PY, S / 'build_diagnosis_context.py', '--reviews', reviews]]
+            cmd = [rpy, '-B', S / 'review_runner.py', '--phase', 'diagnosis', '--inputs-manifest', cfg.manifest_path,
+                   '--skill', skill, '--schema', skill / 'references' / 'output.schema.json',
+                   '--context-root', cfg.out / 'diagnosis' / 'context', '--output', cfg.out / 'diagnosis',
+                   '--concurrency', str(a.review_concurrency)]
+            if a.review_rows:
+                cmd += ['--rows', a.review_rows]
+            if a.review_dry_run:
+                cmd += ['--dry-run']
+            c += [('ALLOW_FAIL', cmd)]
+        c += [[review_python(a), S / 'summarize_diagnoses.py']]
     elif name == 'dossier':
         c += [[PY, S / 'build_dossiers.py', '--dossier-result-chars', str(a.dossier_result_chars)]]
     elif name == 'stats':
@@ -171,7 +193,7 @@ def main():
     t_all = time.time()
     for s in stages:
         outs = STAGE_OUTPUTS.get(s, [])
-        if outs and not a.force and all((cfg.out / o).exists() for o in outs) and s not in ('stats', 'report', 'dossier'):
+        if outs and not a.force and all((cfg.out / o).exists() for o in outs) and s in ('telemetry', 'nodes', 'collab', 'basics'):
             print(f'[{s}] up to date (use --force to rebuild)')
             continue
         print(f'[{s}]', flush=True)

@@ -357,6 +357,12 @@ def main():
                 shutil.copyfile(rj, d / 'review.json')
                 review = json.loads(rj.read_text())
 
+        dg = cfg.out / 'diagnosis' / 'rows' / row
+        if (dg / 'report.md').exists() and (dg / 'STATUS.json').exists() and \
+                json.loads((dg / 'STATUS.json').read_text()).get('state') == 'complete':
+            shutil.copyfile(dg / 'report.md', d / 'diagnosis.md')
+            shutil.copyfile(dg / 'report.json', d / 'diagnosis.json')
+
         # ---- conversation.md ------------------------------------------------------------------
         ev_by_line = {}
         if beh.exists():
@@ -507,7 +513,8 @@ def main():
                                                     [[q['category'], q['severity'], cell(q['description'], 400)] for q in review['quality_flags']]) + '\n']
         md += ['## Files in this directory\n',
                '`conversation.md` all colleague exchanges · `transcript.md` the full trajectory · `REQUIREMENTS.csv` · `NODES.csv` · '
-               '`SOLUTION.md` delivery note · `model.patch` + `PATCH_STAT.csv` · `review.md`/`review.json` reviewer report.\n']
+               '`SOLUTION.md` delivery note · `model.patch` + `PATCH_STAT.csv` · `review.md`/`review.json` round-1 report · '
+               '`diagnosis.md`/`diagnosis.json` round-2 failure diagnosis.\n']
         (d / 'RUN.md').write_text('\n'.join(md))
 
         srow = dict(row=row, task_id=r['task_id'], repo=task.get('repo', ''), language=task.get('language', ''),

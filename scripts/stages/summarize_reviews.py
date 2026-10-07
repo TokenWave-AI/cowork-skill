@@ -122,7 +122,7 @@ def main():
     parser.add_argument('--root', type=Path, default=Path(os.environ.get('CMR_CAMPAIGN', '.')))
     parser.add_argument('--out', type=Path, default=Path(os.environ.get('CMR_OUT', '.')))
     parser.add_argument('--reviews', type=Path, default=None)
-    parser.add_argument('--skill', type=Path, default=skill_root / 'vendor/cowork-trajectory-analysis')
+    parser.add_argument('--skill', type=Path, default=skill_root / 'skills/cowork-trajectory-analysis')
     args, _ = parser.parse_known_args()
     root = args.root.resolve()
     reviews = (args.reviews or args.out / 'review' / 'reviews').resolve()

@@ -1,0 +1,540 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "cowork-failure-diagnosis report",
+ "type": "object",
+ "properties": {
+  "schema_version": {
+   "type": "string",
+   "enum": [
+    "diagnosis-1.0.0"
+   ]
+  },
+  "task": {
+   "type": "object",
+   "properties": {
+    "row": {
+     "type": "string"
+    },
+    "task_id": {
+     "type": "string"
+    },
+    "task_version": {
+     "type": "string"
+    },
+    "run_id": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "row",
+    "task_id",
+    "task_version",
+    "run_id"
+   ],
+   "additionalProperties": false
+  },
+  "outcome": {
+   "type": "object",
+   "properties": {
+    "f2p_passed": {
+     "type": "integer"
+    },
+    "f2p_total": {
+     "type": "integer"
+    },
+    "p2p_passed": {
+     "type": "integer"
+    },
+    "p2p_total": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "f2p_passed",
+    "f2p_total",
+    "p2p_passed",
+    "p2p_total"
+   ],
+   "additionalProperties": false
+  },
+  "headline": {
+   "type": "string"
+  },
+  "requirements": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "req_id": {
+      "type": "string"
+     },
+     "card": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "holder": {
+      "type": "string"
+     },
+     "nodes_failed": {
+      "type": "integer"
+     },
+     "nodes_total": {
+      "type": "integer"
+     },
+     "pipeline_stage": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "stage": {
+      "type": "string",
+      "enum": [
+       "discovery",
+       "ask",
+       "read",
+       "implement",
+       "infrastructure",
+       "not_determinable"
+      ]
+     },
+     "stage_agrees": {
+      "type": "boolean"
+     },
+     "mechanism": {
+      "type": "string",
+      "enum": [
+       "never_surfaced",
+       "surfaced_not_noticed",
+       "owner_never_contacted",
+       "asked_wrong_person",
+       "asked_too_vaguely",
+       "deferral_not_followed",
+       "gave_up_after_failures",
+       "owner_unavailable",
+       "reply_not_returned",
+       "reply_returned_not_read",
+       "answer_ignored",
+       "answer_misread",
+       "assumed_instead_of_asking",
+       "partial_implementation",
+       "regression_elsewhere",
+       "build_or_load_failure",
+       "verified_wrong_thing",
+       "out_of_time",
+       "grader_infrastructure",
+       "not_determinable",
+       "other"
+      ]
+     },
+     "mechanism_note": {
+      "type": "string"
+     },
+     "what_was_needed": {
+      "type": "string"
+     },
+     "what_happened": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "phase": {
+         "type": "string",
+         "enum": [
+          "exposure",
+          "question",
+          "reply",
+          "decision",
+          "code",
+          "check",
+          "delivery",
+          "other"
+         ]
+        },
+        "description": {
+         "type": "string"
+        },
+        "evidence_ids": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "context_refs": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "phase",
+        "description",
+        "evidence_ids",
+        "context_refs"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "counterfactual_step": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "agent_responsible": {
+      "type": "string",
+      "enum": [
+       "yes",
+       "partly",
+       "no",
+       "unclear"
+      ]
+     },
+     "delivery_note": {
+      "type": "object",
+      "properties": {
+       "verdict": {
+        "type": "string",
+        "enum": [
+         "accurate",
+         "overstated",
+         "silent",
+         "understated"
+        ]
+       },
+       "quote": {
+        "type": "string"
+       },
+       "evidence_ids": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "verdict",
+       "quote",
+       "evidence_ids"
+      ],
+      "additionalProperties": false
+     },
+     "confidence": {
+      "type": "string",
+      "enum": [
+       "low",
+       "medium",
+       "high"
+      ]
+     },
+     "context_refs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "required": [
+     "req_id",
+     "card",
+     "holder",
+     "nodes_failed",
+     "nodes_total",
+     "pipeline_stage",
+     "stage",
+     "stage_agrees",
+     "mechanism",
+     "mechanism_note",
+     "what_was_needed",
+     "what_happened",
+     "counterfactual_step",
+     "agent_responsible",
+     "delivery_note",
+     "confidence",
+     "context_refs"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "stage_summary": {
+   "type": "object",
+   "properties": {
+    "counts": {
+     "type": "object",
+     "properties": {
+      "discovery": {
+       "type": "integer"
+      },
+      "ask": {
+       "type": "integer"
+      },
+      "read": {
+       "type": "integer"
+      },
+      "implement": {
+       "type": "integer"
+      },
+      "infrastructure": {
+       "type": "integer"
+      },
+      "not_determinable": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "discovery",
+      "ask",
+      "read",
+      "implement",
+      "infrastructure",
+      "not_determinable"
+     ],
+     "additionalProperties": false
+    },
+    "disagreements_with_pipeline": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "dominant_mechanism": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "counts",
+    "disagreements_with_pipeline",
+    "dominant_mechanism"
+   ],
+   "additionalProperties": false
+  },
+  "delivery_audit": {
+   "type": "object",
+   "properties": {
+    "verdict": {
+     "type": "string",
+     "enum": [
+      "accurate",
+      "mostly_accurate",
+      "overstated",
+      "severely_overstated",
+      "no_note"
+     ]
+    },
+    "summary": {
+     "type": "string"
+    },
+    "overstated_items": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "req_id": {
+        "type": "string"
+       },
+       "claim": {
+        "type": "string"
+       },
+       "reality": {
+        "type": "string"
+       },
+       "evidence_ids": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "context_refs": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "req_id",
+       "claim",
+       "reality",
+       "evidence_ids",
+       "context_refs"
+      ],
+      "additionalProperties": false
+     }
+    }
+   },
+   "required": [
+    "verdict",
+    "summary",
+    "overstated_items"
+   ],
+   "additionalProperties": false
+  },
+  "workplace_findings": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "title": {
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "req_ids": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "evidence_ids": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "context_refs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "novelty": {
+      "type": "string",
+      "enum": [
+       "routine",
+       "notable",
+       "striking"
+      ]
+     }
+    },
+    "required": [
+     "id",
+     "title",
+     "description",
+     "req_ids",
+     "evidence_ids",
+     "context_refs",
+     "novelty"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "blind_review_revisions": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "dimension_or_field": {
+      "type": "string"
+     },
+     "round1": {
+      "type": "string"
+     },
+     "revision": {
+      "type": "string"
+     },
+     "reason": {
+      "type": "string"
+     },
+     "evidence_ids": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "context_refs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "required": [
+     "dimension_or_field",
+     "round1",
+     "revision",
+     "reason",
+     "evidence_ids",
+     "context_refs"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "case_paragraph": {
+   "type": "string"
+  },
+  "evidence": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "path": {
+      "type": "string"
+     },
+     "line_start": {
+      "type": "integer"
+     },
+     "line_end": {
+      "type": "integer"
+     },
+     "event_id": {
+      "type": "string"
+     },
+     "quote": {
+      "type": "string"
+     },
+     "supports": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "path",
+     "line_start",
+     "line_end",
+     "event_id",
+     "quote",
+     "supports"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "limitations": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "case_evidence_ids": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  }
+ },
+ "required": [
+  "schema_version",
+  "task",
+  "outcome",
+  "headline",
+  "requirements",
+  "stage_summary",
+  "delivery_audit",
+  "workplace_findings",
+  "blind_review_revisions",
+  "case_paragraph",
+  "evidence",
+  "limitations",
+  "case_evidence_ids"
+ ],
+ "additionalProperties": false
+}

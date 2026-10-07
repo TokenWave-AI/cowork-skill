@@ -1,6 +1,6 @@
 ---
 name: cowork-model-report
-description: Produce the SWE-CoWork paper's per-model trajectory analysis (outcomes, effort, requirement acquisition, four-stage loss attribution, collaboration metrics, optional 16-dim LLM behaviour rubric and stopping, workplace basics, strata, case candidates) for ANY model's CoWork runs, as statistics.json + report.md + paste-ready LaTeX rows + figures, plus per-run dossiers (every colleague exchange, the full transcript, requirement/node tables with grader output, patch, delivery note, reviewer report) so readers never need the raw trajectories; merges several models with cross_model.py. Use when a new model's CoWork campaign has finished and needs the same analysis as the paper.
+description: Run per-trajectory analysis agents (one Codex agent per run, two rounds: blind behaviour review, then outcome-aware failure diagnosis) over a model's SWE-CoWork runs, and produce the paper's per-model trajectory analysis (outcomes, effort, requirement acquisition, four-stage loss attribution, collaboration metrics, optional 16-dim LLM behaviour rubric and stopping, workplace basics, strata, case candidates) for ANY model's CoWork runs, as statistics.json + report.md + paste-ready LaTeX rows + figures, plus per-run dossiers (every colleague exchange, the full transcript, requirement/node tables with grader output, patch, delivery note, reviewer report) so readers never need the raw trajectories; merges several models with cross_model.py. Use when a new model's CoWork campaign has finished and needs the same analysis as the paper.
 ---
 
 # cowork-model-report
@@ -55,7 +55,11 @@ in `accepted-recovery-private/...` when the accepted score came from a recovery.
 
 Each stage is idempotent. Re-running the same command skips stages whose outputs exist; add
 `--force` to rebuild. `OUT/RUNLOG.jsonl` records every command, its exit code and its duration.
-A bare `$R` runs the default stages: `telemetry,nodes,collab,basics,review-merge,dossier,stats,report`.
+A bare `$R` runs the default stages: `telemetry,nodes,collab,basics,review-merge,dossier,stats,report`
+(everything that needs no API). The two agent rounds (`review`, `diagnose`) are run explicitly.
+
+Typical order for a new model: `prepare` → bare `$R` → `review` → `review-merge,dossier` → `diagnose`
+→ `diagnose-merge,stats,report`.
 
 ### (a) prepare: acquire and normalise trajectories (only for a new campaign)
 Needs the eval status dir (`CURRENT_SCORES.csv`, plus `TRAJECTORY_INDEX.csv` with
@@ -111,33 +115,56 @@ Check that `runs: K Counter({'present': ..., 'empty': ...})` matches the number 
 `match_method: none` should be a minority. In the deferral summary line (`N abandoned M …`), the
 `told` count should be about the number of runs.
 
-### (f) review: optional LLM rubric review (gpt-6-astra, xhigh)
-Wraps the vendored 1.2 skill (`vendor/cowork-trajectory-analysis`, rubric/schema 1.0.0) with
-the campaign's resume-safe runner. Reviewers read only `behavior/`, never outcomes.
+### (f) review — round 1: one blind analysis agent per run
+Each run gets its own Codex agent loaded with `skills/cowork-trajectory-analysis` (rubric/schema 1.0.0).
+The agent reads only that run's `behavior/` directory, never outcomes, and returns an evidence-cited
+JSON: 10 strategy + 6 collaboration dimensions, phases, episodes, the stop judgement and quality flags.
+The controller (`scripts/stages/review_runner.py`) runs N agents in parallel, validates every citation
+mechanically, repairs invalid drafts (up to 2 times), retries transient API failures with backoff
+and halves concurrency on 429. Completed rows are frozen by input/skill/schema hashes.
 ```sh
-$R --stages review --review-rows 1,2,3 --review-dry-run      # binding check, no API calls
-$R --stages review --review-rows 11,20,46,90 --review-concurrency 4   # pilot
-$R --stages review --review-concurrency 20                   # all rows
+$R --stages review --review-rows 1,2 --review-dry-run                 # binding check, no API calls
+$R --stages review --review-rows 11,20,46,90 --review-concurrency 4   # pilot: read these reports
+$R --stages review --review-concurrency 20                            # all runs (100 runs = 100 agents)
+$R --stages review-merge                                              # summary + data/stopping.csv
 ```
-- Needs, from your evaluation pipeline (not in this repository): the reviewer runtime
-  (`CMR_REVIEWER_RUNTIME=/path/to/reviewer_runtime.py`, which also defines the API base URL);
-  an API key (`CMR_REVIEW_API_KEY`, else the runtime's key file); and a Python with
-  jsonschema ≥ 4 (`CMR_REVIEW_PYTHON` or `--review-python`). Extra paths the reviewer
-  sandbox must not read go in `CMR_REVIEW_DENY` (`:`-separated).
-- Opus-5.5 cost for reference (99 runs): median 26 min per attempt (p90 38, max 57). There were
-  1.8 attempts per row on average, counting retries and repairs. Wall time was about 3.5 h at
-  concurrency 16–20. Tokens: 757 M input (732 M cached, 26 M uncached), 4.0 M output; median per
-  run 7.1 M input and 32 k output. Expect roughly the same per run for other models, scaled by
-  trajectory length (`telemetry/RUN_TELEMETRY.csv tool_calls`).
-- Check `OUT/review/reviews/BATCH_STATUS.json`: every row should be `complete`. `held_*` and
-  `needs_manual_review` rows need a human (read `rows/NNN/STATUS.json` and the attempt logs). The summarize step
-  writes `OUT/review/summary/` and `OUT/data/stopping.csv`.
-- Resume: rerun the same command. Completed rows are reused when the input, schema, skill and
-  report hashes match.
-- Skipping and merging later: the report works without this stage. Rubric, stopping and the
-  behaviour figure are then omitted. Reviews produced elsewhere can be merged with
-  `$R --stages review-merge,stats,report --reviews /path/to/reviews`, a directory containing
-  `rows/NNN/{STATUS.json,report.json}`.
+
+### (i) diagnose — round 2: one failure-diagnosis agent per run (after round 1)
+Each run gets a second Codex agent loaded with `skills/cowork-failure-diagnosis`. It sees the same
+`behavior/` plus `OUT/diagnosis/context/NNN/`: test outcomes per requirement with grader output, the
+requirement map, the pipeline's loss stage, what the delivery note said, deferrals, the task's
+complete specification (`SPEC.md`) and the round-1 report. For every failed requirement it traces
+exposure → question → reply → decision → code → check → note in the trajectory, confirms or corrects
+the mechanical loss stage, names a mechanism (`references/mechanisms.md`) and the earliest avoidable
+step, and audits the delivery note. It also lists surprising workplace findings, revises round-1
+judgements the outcome contradicts, and writes a paper-ready case paragraph.
+```sh
+$R --stages dossier                                                   # grader output for the context
+$R --stages diagnose --review-rows 5 --review-concurrency 1           # pilot one run, read its report.md
+$R --stages diagnose --review-concurrency 20                          # all runs
+$R --stages diagnose-merge,stats,report                               # tables + report §13
+```
+Outputs: `OUT/diagnosis/rows/NNN/report.{json,md}` and `OUT/diagnosis/summary/` (`DIAGNOSES.csv` one row per
+failed requirement, `RUNS.csv` headline + case paragraph per run, `FINDINGS.csv`, `REVISIONS.csv`,
+`SUMMARY.json` with the stage-agreement matrix and mechanism counts). The report's §13 lists them.
+
+### Agent runtime (both rounds)
+- Needs: a `codex` CLI binary (`CMR_CODEX_BIN`, tested with 0.156), bubblewrap (`bwrap`), a
+  Responses-API endpoint (`CMR_REVIEW_BASE_URL`, e.g. `https://api.example.com/v1`) and key
+  (`CMR_REVIEW_API_KEY`), and a Python with jsonschema for the controller (`CMR_REVIEW_PYTHON`).
+  Agent model/effort default to `gpt-6-astra`/`xhigh` (`CMR_AGENT_MODEL`, `CMR_AGENT_EFFORT`).
+- Isolation per agent (`scripts/agent_runtime.py`): private CODEX_HOME/HOME/TMPDIR, no user config, no
+  inherited environment, network off for its shell. Writes only to its own attempt directory. Under home,
+  `/data*`, `/mnt`, `/srv`, `/opt` and `/tmp` it sees only its run's `behavior/`, its context and the skill;
+  other runs, outcomes (round 1) and keys are hidden. The real API key stays in the controller, and the
+  agent talks to a local proxy with a one-off token. Put `--out` on a regular disk, not `/tmp`
+  (bubblewrap hides `/tmp`).
+- Cost reference (Opus-5.5 round 1, 99 runs): median 26 min and ~7 M input tokens (mostly cached) /
+  32 k output per run, 1.8 attempts per run, about 3.5 h at concurrency 16–20. Round 2 is similar per run.
+- Check `BATCH_STATUS.json` under `OUT/review/reviews/` or `OUT/diagnosis/`: every row `complete`.
+  `held_*`/`needs_manual_review` rows need a human (`rows/NNN/STATUS.json`, attempt `stderr.log`,
+  `events.jsonl`). Resume by rerunning the same command.
+- Reviews produced elsewhere can be merged with `--reviews DIR` (a directory with `rows/NNN/`).
 
 ### (h) dossier: per-run detail (~15 s)
 ```sh
